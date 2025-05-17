@@ -10,6 +10,7 @@
   "dependencies": {
     "@iarna/toml": "^2.2.5",
     "adm-zip": "^0.5.16",
+    "axios": "^1.9.0",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "express": "^4.17.1",
