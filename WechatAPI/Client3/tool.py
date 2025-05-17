@@ -404,7 +404,7 @@ class ToolMixin(WechatAPIClientBase):
         # 发送请求上传文件
         async with aiohttp.ClientSession() as session:
             json_param = {"Wxid": self.wxid, "Base64": file_base64}
-            response = await session.post(f'http://{self.ip}:{self.port}/api/Tools/UploadFile', json=json_param)
+            response = await session.post(f'http://{self.ip}:{self.port}/api/Tools/UploadAppAttach', json=json_param)
             json_resp = await response.json()
 
             if json_resp.get("Success"):

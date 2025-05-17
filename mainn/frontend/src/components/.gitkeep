@@ -1,0 +1,11 @@
+// 此目录用于存放 Vue 组件。
+// 示例组件:
+// <template>
+//   <div>来自 MyComponent 的问候!</div>
+// </template>
+// 
+// <script>
+// export default {
+//   name: 'MyComponent'
+// }
+// </script> 

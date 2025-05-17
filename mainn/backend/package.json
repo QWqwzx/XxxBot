@@ -1,0 +1,23 @@
+{
+  "name": "admin-panel-backend",
+  "version": "1.0.0",
+  "description": "管理面板后端",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "@iarna/toml": "^2.2.5",
+    "adm-zip": "^0.5.16",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "express": "^4.17.1",
+    "fs-extra": "^11.1.1",
+    "multer": "^1.4.5-lts.1",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15"
+  }
+}

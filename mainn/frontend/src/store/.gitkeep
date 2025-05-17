@@ -1,0 +1,4 @@
+// 此目录用于存放 Vuex store 的配置。
+// 示例 (store/index.js):
+// import { createStore } from 'vuex';
+// export default createStore({ state: {}, mutations: {}, actions: {}, modules: {} }); 

@@ -1,0 +1,6 @@
+// 此目录用于存放 Vue Router 的配置。
+// 示例 (router/index.js):
+// import { createRouter, createWebHistory } from 'vue-router';
+// const routes = [];
+// const router = createRouter({ history: createWebHistory(process.env.BASE_URL), routes });
+// export default router; 
