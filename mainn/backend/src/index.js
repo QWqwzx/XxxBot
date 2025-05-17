@@ -10,7 +10,7 @@ const apiRoutes = require('./routes/api'); // 导入API路由
 
 // CORS配置
 const corsOptions = {
-  origin: '*', // 允许所有来源
+  origin: 'http://localhost:8080', // 明确指定前端域名，不使用通配符
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept']

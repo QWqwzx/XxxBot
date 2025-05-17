@@ -23,6 +23,9 @@ export function getPlugins() {
       return response.data.plugins || [];
     }
     return [];
+  }).catch(error => {
+    console.error('获取插件列表失败:', error);
+    return []; // 出错时返回空数组
   });
 }
 
@@ -126,8 +129,11 @@ export function getMarketplacePlugins() {
 
   // 构建API URL
   const apiUrl = `${MARKETPLACE_API.BASE_URL}${MARKETPLACE_API.LIST}`;
+  console.log('正在请求插件市场数据:', apiUrl);
+  
   // 使用CORS代理处理URL
   const proxiedUrl = proxifyUrl(apiUrl);
+  console.log('代理后的URL:', proxiedUrl);
 
   // 使用带重试机制的请求
   return fetchWithCorsRetry(async () => {
@@ -136,7 +142,8 @@ export function getMarketplacePlugins() {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      timeout: 15000
+      timeout: 15000,
+      withCredentials: false // 确保不发送凭证
     });
     
     const data = response.data;
