@@ -4,18 +4,19 @@ import { ElMessage } from 'element-plus';
 // 创建一个axios实例
 const service = axios.create({
   baseURL: 'http://localhost:3000', // 直接指向后端服务器地址
-  timeout: 10000, // 请求超时时间10秒
-  withCredentials: true // 跨域请求时发送cookie
+  timeout: 15000, // 请求超时时间15秒
+  withCredentials: false, // 不发送凭证信息
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
 });
 
 // 请求拦截器
 service.interceptors.request.use(
   config => {
-    // 在请求发送前做一些处理，例如添加token
-    // const token = localStorage.getItem('token');
-    // if (token) {
-    //   config.headers['Authorization'] = `Bearer ${token}`;
-    // }
+    // 调试输出请求信息
+    console.log(`发送请求: ${config.method.toUpperCase()} ${config.url}`);
     return config;
   },
   error => {
@@ -29,6 +30,7 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   response => {
     const res = response.data;
+    console.log(`收到响应: ${response.config.url}`, res);
     
     // 业务级错误处理
     if (res.success === false) {
@@ -38,12 +40,6 @@ service.interceptors.response.use(
         duration: 5000
       });
       
-      // 特定错误码处理，例如未授权（401）、无权限（403）等
-      if (res.code === 401) {
-        // 处理未登录/token过期
-        // 可以重定向到登录页或刷新token
-      }
-      
       return res; // 保持返回原始响应，让调用方处理
     } else {
       return res; // 返回正常响应
@@ -51,6 +47,18 @@ service.interceptors.response.use(
   },
   error => {
     console.error('响应错误:', error);
+    // 详细记录错误信息
+    if (error.response) {
+      console.error('状态码:', error.response.status);
+      console.error('响应头:', error.response.headers);
+      console.error('响应数据:', error.response.data);
+    } else if (error.request) {
+      console.error('请求已发送但没有收到响应');
+      console.error('请求:', error.request);
+    } else {
+      console.error('请求配置错误:', error.message);
+    }
+    
     // 网络级错误处理
     let message = '网络错误，请稍后再试';
     
@@ -63,7 +71,6 @@ service.interceptors.response.use(
           break;
         case 401:
           message = '未登录或登录已过期';
-          // 可以重定向到登录页
           break;
         case 403:
           message = '无权限进行此操作';

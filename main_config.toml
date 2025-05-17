@@ -47,7 +47,6 @@ disabled-plugins = [
   "GetContact",
   "FileUploadTest",
   "GroupWelcome",
-  "Leaderboard",
   "LuckyDraw",
   "News",
   "Music",
@@ -57,7 +56,8 @@ disabled-plugins = [
   "RaiseCard",
   "RedPacket",
   "VideoDemand",
-  "SignIn"
+  "SignIn",
+  "Leaderboard"
 ]
 timezone = "Asia/Shanghai"
 auto-restart = false
