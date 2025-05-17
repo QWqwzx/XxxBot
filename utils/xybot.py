@@ -14,8 +14,12 @@ from loguru import logger
 from WechatAPI import WechatAPIClient
 from WechatAPI.Client.protect import protector
 from database.messsagDB import MessageDB
+from database.MessageCounter import MessageCounter  # 导入消息计数器
 from database.contacts_db import update_contact_in_db, get_contact_from_db
 from utils.event_manager import EventManager
+
+# 获取消息计数器实例
+message_counter = MessageCounter()
 
 
 class XYBot:
@@ -445,75 +449,116 @@ class XYBot:
             logger.error(f"更新联系人信息时发生异常: {str(e)}")
 
     async def process_message(self, message: Dict[str, Any]):
-        """处理接收到的消息"""
+        """处理收到的消息"""
+        # 记录消息统计
+        try:
+            # 判断消息平台
+            platform = "wechat"  # 默认平台
+            if "@chatroom" in message.get("FromWxid", ""):
+                platform = "wechat_group"
+                
+            # 更新消息计数
+            message_counter.count_message(platform)
+            logger.debug(f"已记录一条{platform}消息")
+        except Exception as e:
+            logger.error(f"消息统计失败: {e}")
+        
+        # 原有的消息处理逻辑
+        try:
+            # 先对消息进行白名单/黑名单检查
+            FromWxid = message.get("FromWxid", None)
+            SenderWxid = message.get("SenderWxid", None)
+            Type = message.get("Type", 0)
+            Content = message.get("Content", "")
+            
+            # 确保Content是字符串
+            if isinstance(Content, dict) and "string" in Content:
+                Content = Content["string"]
+            elif not isinstance(Content, str):
+                Content = str(Content)
 
-        msg_type = message.get("MsgType")
-
-        # 预处理消息
-        # 确保 FromWxid 始终是字符串，默认为空字符串
-        from_user = message.get("FromUserName", {})
-        if isinstance(from_user, dict):
-            message["FromWxid"] = from_user.get("string", "")
-        else:
-            message["FromWxid"] = str(from_user) if from_user else ""
-        message.pop("FromUserName", None)
-
-        # 确保 ToWxid 始终是字符串，默认为空字符串
-        to_wxid = message.get("ToWxid", {})
-        if isinstance(to_wxid, dict):
-            message["ToWxid"] = to_wxid.get("string", "")
-        else:
-            message["ToWxid"] = str(to_wxid) if to_wxid else ""
-
-        # 处理一下自己发的消息
-        to_wxid = message.get("ToWxid", "")
-        if message.get("FromWxid") == self.wxid and isinstance(to_wxid, str) and to_wxid.endswith("@chatroom"):
-            message["FromWxid"], message["ToWxid"] = message["ToWxid"], message["FromWxid"]
-
-        # 异步更新发送者联系人信息
-        from_wxid = message.get("FromWxid", "")
-        if from_wxid and from_wxid != self.wxid:
-            # 如果是群聊，只更新群聊本身信息
-            if from_wxid.endswith("@chatroom"):
-                logger.info(f"开始异步更新群聊信息: {from_wxid}")
-                update_task = asyncio.create_task(self.update_contact_info(from_wxid))
-                # 添加回调以记录完成状态
-                update_task.add_done_callback(
-                    lambda t: logger.info(f"完成群聊信息更新: {from_wxid}, 状态: {'success' if not t.exception() else f'error: {t.exception()}'}")
+            # 新增：保存到消息数据库
+            try:
+                await self.msg_db.save_message(
+                    msg_id=message.get("ID", 0),
+                    sender_wxid=SenderWxid or "",
+                    from_wxid=FromWxid or "",
+                    msg_type=Type,
+                    content=Content,
+                    is_group=True if "@chatroom" in (FromWxid or "") else False
                 )
-            # 如果是私聊，更新发送者信息
-            elif not from_wxid.endswith("@chatroom"):
-                logger.info(f"开始异步更新发送者联系人信息: {from_wxid}")
-                update_task = asyncio.create_task(self.update_contact_info(from_wxid))
-                # 添加回调以记录完成状态
-                update_task.add_done_callback(
-                    lambda t: logger.info(f"完成发送者联系人信息更新: {from_wxid}, 状态: {'success' if not t.exception() else f'error: {t.exception()}'}")
-                )
+            except Exception as e:
+                logger.error(f"保存消息到数据库失败: {e}")
 
-        # 根据消息类型触发不同的事件
-        if msg_type == 1:  # 文本消息
-            await self.process_text_message(message)
-        elif msg_type == 3:  # 图片消息
-            await self.process_image_message(message)
-        elif msg_type == 34:  # 语音消息
-            await self.process_voice_message(message)
-        elif msg_type == 43:  # 视频消息
-            await self.process_video_message(message)
-        elif msg_type == 47:  # 表情消息
-            await self.process_emoji_message(message)
-        elif msg_type == 49:  # xml消息
-            await self.process_xml_message(message)
-        elif msg_type == 10002:  # 系统消息
-            await self.process_system_message(message)
-        elif msg_type == 37:  # 好友请求
-            if self.ignore_protection or not protector.check(14400):
-                await EventManager.emit("friend_request", self.bot, message)
+            msg_type = message.get("MsgType")
+
+            # 预处理消息
+            # 确保 FromWxid 始终是字符串，默认为空字符串
+            from_user = message.get("FromUserName", {})
+            if isinstance(from_user, dict):
+                message["FromWxid"] = from_user.get("string", "")
             else:
-                logger.warning("风控保护: 新设备登录后4小时内请挂机")
-        elif msg_type == 51:
-            pass
-        else:
-            logger.info("未知的消息类型: {}", message)
+                message["FromWxid"] = str(from_user) if from_user else ""
+            message.pop("FromUserName", None)
+
+            # 确保 ToWxid 始终是字符串，默认为空字符串
+            to_wxid = message.get("ToWxid", {})
+            if isinstance(to_wxid, dict):
+                message["ToWxid"] = to_wxid.get("string", "")
+            else:
+                message["ToWxid"] = str(to_wxid) if to_wxid else ""
+
+            # 处理一下自己发的消息
+            to_wxid = message.get("ToWxid", "")
+            if message.get("FromWxid") == self.wxid and isinstance(to_wxid, str) and to_wxid.endswith("@chatroom"):
+                message["FromWxid"], message["ToWxid"] = message["ToWxid"], message["FromWxid"]
+
+            # 异步更新发送者联系人信息
+            from_wxid = message.get("FromWxid", "")
+            if from_wxid and from_wxid != self.wxid:
+                # 如果是群聊，只更新群聊本身信息
+                if from_wxid.endswith("@chatroom"):
+                    logger.info(f"开始异步更新群聊信息: {from_wxid}")
+                    update_task = asyncio.create_task(self.update_contact_info(from_wxid))
+                    # 添加回调以记录完成状态
+                    update_task.add_done_callback(
+                        lambda t: logger.info(f"完成群聊信息更新: {from_wxid}, 状态: {'success' if not t.exception() else f'error: {t.exception()}'}")
+                    )
+                # 如果是私聊，更新发送者信息
+                elif not from_wxid.endswith("@chatroom"):
+                    logger.info(f"开始异步更新发送者联系人信息: {from_wxid}")
+                    update_task = asyncio.create_task(self.update_contact_info(from_wxid))
+                    # 添加回调以记录完成状态
+                    update_task.add_done_callback(
+                        lambda t: logger.info(f"完成发送者联系人信息更新: {from_wxid}, 状态: {'success' if not t.exception() else f'error: {t.exception()}'}")
+                    )
+
+            # 根据消息类型触发不同的事件
+            if msg_type == 1:  # 文本消息
+                await self.process_text_message(message)
+            elif msg_type == 3:  # 图片消息
+                await self.process_image_message(message)
+            elif msg_type == 34:  # 语音消息
+                await self.process_voice_message(message)
+            elif msg_type == 43:  # 视频消息
+                await self.process_video_message(message)
+            elif msg_type == 47:  # 表情消息
+                await self.process_emoji_message(message)
+            elif msg_type == 49:  # xml消息
+                await self.process_xml_message(message)
+            elif msg_type == 10002:  # 系统消息
+                await self.process_system_message(message)
+            elif msg_type == 37:  # 好友请求
+                if self.ignore_protection or not protector.check(14400):
+                    await EventManager.emit("friend_request", self.bot, message)
+                else:
+                    logger.warning("风控保护: 新设备登录后4小时内请挂机")
+            elif msg_type == 51:
+                pass
+            else:
+                logger.info("未知的消息类型: {}", message)
+        except Exception as e:
+            logger.error(f"处理消息时发生异常: {e}")
 
     async def process_text_message(self, message: Dict[str, Any]):
         """处理文本消息"""
@@ -550,12 +595,19 @@ class XYBot:
             ats = []
         message["Ats"] = ats if ats and ats[0] != "" else []
 
+        # 确保content是字符串
+        content = message["Content"]
+        if isinstance(content, dict) and "string" in content:
+            content = content["string"]
+        elif not isinstance(content, str):
+            content = str(content)
+
         await self.msg_db.save_message(
             msg_id=int(message.get("MsgId", 0)),
             sender_wxid=message["SenderWxid"],
             from_wxid=message["FromWxid"],
             msg_type=int(message.get("MsgType", 0)),
-            content=message["Content"],
+            content=content,
             is_group=message["IsGroup"]
         )
 
@@ -617,12 +669,19 @@ class XYBot:
                     message.get("MsgId", ""), message["FromWxid"],
                     message["SenderWxid"], message["Content"])
 
+        # 确保content是字符串
+        content = message.get("MsgSource", "")
+        if isinstance(content, dict) and "string" in content:
+            content = content["string"]
+        elif not isinstance(content, str):
+            content = str(content)
+
         await self.msg_db.save_message(
             msg_id=int(message.get("MsgId", 0)),
             sender_wxid=message["SenderWxid"],
             from_wxid=message["FromWxid"],
             msg_type=int(message.get("MsgType", 0)),
-            content=message.get("MsgSource", ""),
+            content=content,
             is_group=message["IsGroup"]
         )
 
@@ -782,12 +841,19 @@ class XYBot:
                     message.get("MsgId", ""), message["FromWxid"],
                     message["SenderWxid"], message["Content"])
 
+        # 确保content是字符串
+        content = message["Content"]
+        if isinstance(content, dict) and "string" in content:
+            content = content["string"]
+        elif not isinstance(content, str):
+            content = str(content)
+
         await self.msg_db.save_message(
             msg_id=int(message.get("MsgId", 0)),
             sender_wxid=message["SenderWxid"],
             from_wxid=message["FromWxid"],
             msg_type=int(message.get("MsgType", 0)),
-            content=message["Content"],
+            content=content,
             is_group=message["IsGroup"]
         )
 
@@ -842,12 +908,19 @@ class XYBot:
                     message.get("MsgId", ""), message["FromWxid"],
                     message["ActualUserWxid"], message["Content"])
 
+        # 确保content是字符串
+        content = message["Content"]
+        if isinstance(content, dict) and "string" in content:
+            content = content["string"]
+        elif not isinstance(content, str):
+            content = str(content)
+
         await self.msg_db.save_message(
             msg_id=int(message.get("MsgId", 0)),
             sender_wxid=message["ActualUserWxid"],
             from_wxid=message["FromWxid"],
             msg_type=int(message.get("MsgType", 0)),
-            content=message["Content"],
+            content=content,
             is_group=message["IsGroup"]
         )
 
@@ -882,13 +955,20 @@ class XYBot:
                 message["FromWxid"] = message["ToWxid"]
             message["IsGroup"] = False
 
+        # 确保content是字符串
+        content = message["Content"]
+        if isinstance(content, dict) and "string" in content:
+            content = content["string"]
+        elif not isinstance(content, str):
+            content = str(content)
+
         # 保存消息到数据库（即使解析失败也保存）
         await self.msg_db.save_message(
             msg_id=int(message.get("MsgId", 0)),
             sender_wxid=message["SenderWxid"],
             from_wxid=message["FromWxid"],
             msg_type=int(message.get("MsgType", 0)),
-            content=message["Content"],
+            content=content,
             is_group=message["IsGroup"]
         )
 
@@ -1069,12 +1149,19 @@ class XYBot:
                     message.get("MsgId", ""), message["FromWxid"],
                     message["SenderWxid"], message["Content"])
 
+        # 确保content是字符串
+        content = message["Content"]
+        if isinstance(content, dict) and "string" in content:
+            content = content["string"]
+        elif not isinstance(content, str):
+            content = str(content)
+
         await self.msg_db.save_message(
             msg_id=int(message.get("MsgId", 0)),
             sender_wxid=message["SenderWxid"],
             from_wxid=message["FromWxid"],
             msg_type=int(message.get("MsgType", 0)),
-            content=message["Content"],
+            content=content,
             is_group=message["IsGroup"]
         )
 
@@ -1104,12 +1191,19 @@ class XYBot:
                     message.get("MsgId", ""), message["FromWxid"],
                     message["SenderWxid"], message["Content"])
 
+        # 确保content是字符串
+        content = message["Content"]
+        if isinstance(content, dict) and "string" in content:
+            content = content["string"]
+        elif not isinstance(content, str):
+            content = str(content)
+
         await self.msg_db.save_message(
             msg_id=int(message.get("MsgId", 0)),
             sender_wxid=message["SenderWxid"],
             from_wxid=message["FromWxid"],
             msg_type=int(message.get("MsgType", 0)),
-            content=message["Content"],
+            content=content,
             is_group=message["IsGroup"]
         )
 
@@ -1183,12 +1277,19 @@ class XYBot:
                     message["SenderWxid"], message["Patter"],
                     message["Patted"], message["PatSuffix"])
 
+        # 创建拍一拍内容
+        pat_content = f"{message['Patter']} 拍了拍 {message['Patted']} {message['PatSuffix']}"
+        
+        # 确保content是字符串
+        if not isinstance(pat_content, str):
+            pat_content = str(pat_content)
+
         await self.msg_db.save_message(
             msg_id=int(message.get("MsgId", 0)),
             sender_wxid=message["SenderWxid"],
             from_wxid=message["FromWxid"],
             msg_type=int(message.get("MsgType", 0)),
-            content=f"{message['Patter']} 拍了拍 {message['Patted']} {message['PatSuffix']}",
+            content=pat_content,
             is_group=message["IsGroup"]
         )
 

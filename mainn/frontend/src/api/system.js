@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3000/api';
+// 使用相对路径而不是硬编码的localhost URL
+const API_URL = '/api';
 
 // 创建axios实例
 const apiClient = axios.create({
@@ -14,8 +15,11 @@ const apiClient = axios.create({
 // 系统管理API
 export const systemApi = {
   // 获取系统状态
-  getSystemStatus() {
-    return apiClient.get('/system/status');
+  getSystemStatus(params) {
+    // 添加时间戳防止缓存
+    const timestamp = new Date().getTime();
+    const queryParams = { ...params, t: timestamp };
+    return apiClient.get('/system/status', { params: queryParams });
   },
   
   // 获取系统信息
@@ -25,7 +29,42 @@ export const systemApi = {
   
   // 获取机器人状态
   getBotStatus() {
-    return apiClient.get('/system/bot/status');
+    // 添加时间戳防止缓存
+    const timestamp = new Date().getTime();
+    return apiClient.get(`/system/bot/status?t=${timestamp}`);
+  },
+  
+  // 获取系统配置
+  getSystemConfig() {
+    // 添加时间戳防止缓存
+    const timestamp = new Date().getTime();
+    return apiClient.get(`/system/config?t=${timestamp}`);
+  },
+  
+  // 更新系统配置
+  updateSystemConfig(section, key, value) {
+    return apiClient.post('/system/config/update', { section, key, value });
+  },
+  
+  // 更新协议版本
+  updateProtocolVersion(version) {
+    return apiClient.post('/system/protocol/update', { version });
+  },
+  
+  // 更新过滤模式
+  updateFilterMode(mode) {
+    return apiClient.post('/system/filter/update', { mode });
+  },
+  
+  // 获取原始配置文件内容
+  getRawConfig() {
+    const timestamp = new Date().getTime();
+    return apiClient.get(`/system/config/raw?t=${timestamp}`);
+  },
+  
+  // 保存原始配置文件内容
+  saveRawConfig(content) {
+    return apiClient.post('/system/config/raw/save', { content });
   },
   
   // 检查新版本

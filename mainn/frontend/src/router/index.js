@@ -1,15 +1,28 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import Home from '../views/Home.vue';
+import DashboardView from '../views/Dashboard.vue';
+import ConfigEditor from '../views/ConfigEditor.vue';
 
 const routes = [
   {
     path: '/',
-    redirect: '/dashboard'
+    name: 'home',
+    component: Home
   },
   {
     path: '/dashboard',
-    name: 'Dashboard',
-    component: () => import('../views/Dashboard.vue'),
-    meta: { title: '控制台' }
+    name: 'dashboard',
+    component: DashboardView
+  },
+  {
+    path: '/config',
+    name: 'config',
+    component: ConfigEditor
+  },
+  {
+    path: '/about',
+    name: 'about',
+    component: () => import(/* webpackChunkName: "about" */ '../views/About.vue')
   },
   {
     path: '/system',
@@ -112,12 +125,6 @@ const routes = [
     name: 'Settings',
     component: () => import('../views/Settings.vue'),
     meta: { title: '设置' }
-  },
-  {
-    path: '/about',
-    name: 'About',
-    component: () => import('../views/About.vue'),
-    meta: { title: '关于' }
   }
 ];
 

@@ -699,8 +699,8 @@ export default {
       });
       
       try {
-        // 从API获取真实的插件市场数据，强制刷新（不使用缓存）
-        const plugins = await getMarketplacePlugins(true);
+        // 从API获取真实的插件市场数据
+        const plugins = await getMarketplacePlugins();
         marketplacePlugins.value = plugins;
         
         // 如果获取到了插件，提取市场版本信息

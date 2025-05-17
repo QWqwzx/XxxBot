@@ -1,27 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const systemController = require('../controllers/systemController');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-
-// 配置文件上传中间件
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    // 临时将文件保存到uploads目录
-    const uploadsDir = path.join(__dirname, '../../uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    // 使用原始文件名
-    cb(null, file.originalname);
-  }
-});
-
-const upload = multer({ storage: storage });
 
 // 系统状态
 router.get('/status', systemController.getSystemStatus);
@@ -59,20 +38,5 @@ router.get('/plugins/:pluginName/config', systemController.getPluginConfig);
 
 // 保存插件配置
 router.post('/plugins/:pluginName/config', systemController.savePluginConfig);
-
-// 安装插件
-router.post('/plugins/install', systemController.installPlugin);
-
-// 新增：处理通过前端直接下载安装的插件
-router.post('/plugins/direct-install', upload.array('files'), systemController.directInstallPlugin);
-
-// 新增：保存从前端下载和解压的插件文件
-router.post('/plugins/save-extracted', systemController.saveExtractedPlugin);
-
-// 新增：从GitHub下载并安装插件
-router.post('/plugins/download-and-install', systemController.downloadAndInstallPlugin);
-
-// 新增：删除插件
-router.post('/plugins/delete', systemController.deletePlugin);
 
 module.exports = router; 

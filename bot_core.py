@@ -14,10 +14,14 @@ import WechatAPI
 from database.XYBotDB import XYBotDB
 from database.keyvalDB import KeyvalDB
 from database.messsagDB import MessageDB
+from database.MessageCounter import MessageCounter  # 导入消息计数器
 from utils.decorators import scheduler
 from utils.plugin_manager import plugin_manager
 from utils.xybot import XYBot
 from utils.notification_service import init_notification_service, get_notification_service
+
+# 创建消息计数器实例
+message_counter = MessageCounter()
 
 # 导入管理后台模块
 try:

@@ -13,6 +13,10 @@ exports.getSystemStatus = (req, res) => {
     const totalMem = os.totalmem();
     const freeMem = os.freemem();
 
+    // 计算实际使用的内存
+    const usedMem = totalMem - freeMem;
+    const memUsagePercent = Math.round((usedMem / totalMem) * 100);
+
     const systemStatus = {
       cpu: {
         // 将微秒转换为毫秒并计算CPU使用百分比(简化计算)
@@ -22,8 +26,8 @@ exports.getSystemStatus = (req, res) => {
       memory: {
         total: Math.round(totalMem / (1024 * 1024)),
         free: Math.round(freeMem / (1024 * 1024)),
-        used: Math.round((totalMem - freeMem) / (1024 * 1024)),
-        usagePercentage: Math.round(((totalMem - freeMem) / totalMem) * 100),
+        used: Math.round(usedMem / (1024 * 1024)),
+        usagePercentage: memUsagePercent,
         processUsage: Math.round(memUsage.rss / (1024 * 1024))
       },
       uptime: {
@@ -95,23 +99,87 @@ exports.getSystemInfo = (req, res) => {
   }
 };
 
-// 获取机器人状态 (模拟数据，实际应从数据库或真实机器人状态获取)
+// 获取机器人状态 (从实际文件读取数据)
 exports.getBotStatus = (req, res) => {
   try {
-    // 这里是模拟数据，实际项目中应该从真实的机器人状态数据获取
-    const botStatus = {
-      status: "online", // online, offline, error
-      lastActive: new Date().toISOString(),
-      connections: 3,
-      uptime: 1234567, // 秒
-      messagesProcessed: 1500,
+    // 查找主项目根目录（假设后端在主项目的子目录中）
+    const rootDir = path.resolve(__dirname, '../../../..');
+    
+    // 读取bot_status.json文件
+    const botStatusPath = path.join(rootDir, 'bot_status.json');
+    let botStatus = {};
+    
+    if (fs.existsSync(botStatusPath)) {
+      try {
+        // 添加时间戳作为查询参数，防止缓存
+        const timestamp = Date.now();
+        const statusData = fs.readFileSync(botStatusPath, 'utf-8');
+        botStatus = JSON.parse(statusData);
+        console.log('成功读取机器人状态文件');
+      } catch (error) {
+        console.error('解析机器人状态文件失败:', error);
+        botStatus = { status: "error", details: "状态文件解析失败" };
+      }
+    } else {
+      console.warn('机器人状态文件不存在:', botStatusPath);
+      botStatus = { status: "unknown", details: "状态文件不存在" };
+    }
+    
+    // 读取消息统计数据
+    const messageStatsPath = path.join(rootDir, 'message_stats.json');
+    let messageStats = {
+      total_messages: 0,
+      today_messages: 0,
+      growth_rate: 0,
+      platform_count: 0,
+      platforms: {}
+    };
+    
+    if (fs.existsSync(messageStatsPath)) {
+      try {
+        // 添加时间戳作为查询参数，防止缓存
+        const timestamp = Date.now();
+        const statsData = fs.readFileSync(messageStatsPath, 'utf-8');
+        messageStats = JSON.parse(statsData);
+        console.log('成功读取消息统计文件');
+      } catch (error) {
+        console.error('解析消息统计文件失败:', error);
+      }
+    } else {
+      console.warn('消息统计文件不存在:', messageStatsPath);
+    }
+    
+    // 计算运行时间（秒）
+    let uptime = 0;
+    if (botStatus.timestamp) {
+      uptime = Math.floor(Date.now() / 1000 - botStatus.timestamp);
+    }
+    
+    // 今天的日期，格式为YYYY-MM-DD
+    const today = new Date().toISOString().split('T')[0];
+    
+    // 构建响应数据
+    const responseData = {
+      status: botStatus.status || "unknown",
+      lastActive: botStatus.last_update || new Date().toISOString(),
+      connections: messageStats.platform_count || 0,
+      uptime: uptime,
+      messagesProcessed: messageStats.total_messages || 0,
+      todayMessages: messageStats.daily_messages ? messageStats.daily_messages[today] || 0 : 0,
+      growthRate: messageStats.growth_rate !== undefined ? messageStats.growth_rate : 
+                  (messageStats.daily_messages && messageStats.daily_messages[today] > 0 ? 100 : 0),
+      avg_daily: messageStats.avg_daily || messageStats.today_messages || (messageStats.daily_messages ? messageStats.daily_messages[today] || 0 : 0),
       errors: 0,
-      warnings: 2
+      warnings: 0,
+      nickname: botStatus.nickname || "AABOT",
+      wxid: botStatus.wxid || "",
+      details: botStatus.details || "",
+      platforms: messageStats.platforms || {}
     };
 
     res.json({
       success: true,
-      data: botStatus
+      data: responseData
     });
   } catch (error) {
     console.error('获取机器人状态失败:', error);
@@ -1482,6 +1550,484 @@ exports.deletePlugin = async (req, res) => {
     res.status(500).json({
       success: false,
       message: '删除插件失败',
+      error: error.message
+    });
+  }
+};
+
+// 获取系统配置信息
+exports.getSystemConfig = (req, res) => {
+  try {
+    // 查找主项目根目录
+    const rootDir = path.resolve(__dirname, '../../../..');
+    const configPath = path.join(rootDir, 'main_config.toml');
+    
+    if (!fs.existsSync(configPath)) {
+      return res.status(404).json({
+        success: false,
+        message: '配置文件不存在',
+        error: `找不到文件: ${configPath}`
+      });
+    }
+    
+    // 读取TOML配置文件
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    const config = TOML.parse(configContent);
+    
+    // 提取有用的配置信息
+    const systemConfig = {
+      protocol: {
+        version: config.Protocol?.version || '未知',
+        type: config.Framework?.type || 'default'
+      },
+      server: {
+        host: config.WechatAPIServer?.host || '127.0.0.1',
+        port: config.WechatAPIServer?.port || 9011,
+        mode: config.WechatAPIServer?.mode || 'release'
+      },
+      bot: {
+        version: config.XYBot?.version || 'v1.0.0',
+        names: config.XYBot?.['robot-names'] || [],
+        wxids: config.XYBot?.['robot-wxids'] || [],
+        ignoreProtection: config.XYBot?.['ignore-protection'] === true,
+        enableGroupWakeup: config.XYBot?.['enable-group-wakeup'] === true,
+        groupWakeupWords: config.XYBot?.['group-wakeup-words'] || [],
+        timezone: config.XYBot?.timezone || 'Asia/Shanghai',
+        autoRestart: config.XYBot?.['auto-restart'] === true
+      },
+      admin: {
+        enabled: config.Admin?.enabled === true,
+        host: config.Admin?.host || '0.0.0.0',
+        port: config.Admin?.port || 9090,
+        debug: config.Admin?.debug === true,
+        logLevel: config.Admin?.log_level || 'INFO'
+      },
+      plugins: {
+        total: 0,
+        enabled: 0,
+        disabled: config.XYBot?.['disabled-plugins']?.length || 0,
+        disabledList: config.XYBot?.['disabled-plugins'] || []
+      },
+      autoRestart: {
+        enabled: config.AutoRestart?.enabled === true,
+        checkInterval: config.AutoRestart?.['check-interval'] || 60,
+        offlineThreshold: config.AutoRestart?.['offline-threshold'] || 300,
+        maxRestartAttempts: config.AutoRestart?.['max-restart-attempts'] || 3
+      },
+      notification: {
+        enabled: config.Notification?.enabled === true,
+        channel: config.Notification?.channel || '',
+        triggers: config.Notification?.triggers || {}
+      },
+      callback: {
+        enabled: config.Callback?.enabled === true,
+        path: config.Callback?.path || '',
+        mode: config.Callback?.mode || 'all',
+        types: config.Callback?.filter?.types || []
+      }
+    };
+    
+    // 返回系统配置
+    res.json({
+      success: true,
+      data: systemConfig
+    });
+  } catch (error) {
+    console.error('获取系统配置失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取系统配置失败',
+      error: error.message
+    });
+  }
+};
+
+// 更新系统配置
+exports.updateSystemConfig = (req, res) => {
+  try {
+    const { section, key, value } = req.body;
+    
+    // 查找主项目根目录
+    const rootDir = path.resolve(__dirname, '../../../..');
+    const configPath = path.join(rootDir, 'main_config.toml');
+    
+    if (!fs.existsSync(configPath)) {
+      return res.status(404).json({
+        success: false,
+        message: '配置文件不存在',
+        error: `找不到文件: ${configPath}`
+      });
+    }
+    
+    // 读取TOML配置文件
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    let config = TOML.parse(configContent);
+    
+    // 更新指定部分的配置
+    if (section && key && value !== undefined) {
+      if (!config[section]) {
+        config[section] = {};
+      }
+      
+      console.log(`更新配置: ${section}.${key} = ${JSON.stringify(value)}`);
+      config[section][key] = value;
+    }
+    
+    // 保存配置文件
+    fs.writeFileSync(configPath, TOML.stringify(config));
+    
+    res.json({
+      success: true,
+      message: '配置已更新',
+      data: { section, key, value }
+    });
+  } catch (error) {
+    console.error('更新系统配置失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '更新系统配置失败',
+      error: error.message
+    });
+  }
+};
+
+// 更新过滤模式
+exports.updateFilterMode = (req, res) => {
+  try {
+    const { mode } = req.body;
+    
+    if (!['None', 'Whitelist', 'Blacklist'].includes(mode)) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的过滤模式',
+        error: '过滤模式必须是 None, Whitelist 或 Blacklist'
+      });
+    }
+    
+    // 查找主项目根目录
+    const rootDir = path.resolve(__dirname, '../../../..');
+    const configPath = path.join(rootDir, 'main_config.toml');
+    
+    if (!fs.existsSync(configPath)) {
+      return res.status(404).json({
+        success: false,
+        message: '配置文件不存在',
+        error: `找不到文件: ${configPath}`
+      });
+    }
+    
+    // 读取TOML配置文件
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    let config = TOML.parse(configContent);
+    
+    // 确保AutoRestart部分存在
+    if (!config.AutoRestart) {
+      config.AutoRestart = {};
+    }
+    
+    // 更新过滤模式
+    config.AutoRestart['ignore-mode'] = mode;
+    
+    // 保存配置文件
+    fs.writeFileSync(configPath, TOML.stringify(config));
+    
+    res.json({
+      success: true,
+      message: `过滤模式已更新为 ${mode}`,
+      data: { mode }
+    });
+  } catch (error) {
+    console.error('更新过滤模式失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '更新过滤模式失败',
+      error: error.message
+    });
+  }
+};
+
+// 更新协议版本
+exports.updateProtocolVersion = (req, res) => {
+  try {
+    const { version } = req.body;
+    
+    if (!version || typeof version !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: '无效的协议版本',
+        error: '协议版本必须是非空字符串'
+      });
+    }
+    
+    // 查找主项目根目录
+    const rootDir = path.resolve(__dirname, '../../../..');
+    const configPath = path.join(rootDir, 'main_config.toml');
+    
+    if (!fs.existsSync(configPath)) {
+      return res.status(404).json({
+        success: false,
+        message: '配置文件不存在',
+        error: `找不到文件: ${configPath}`
+      });
+    }
+    
+    // 读取TOML配置文件
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    let config = TOML.parse(configContent);
+    
+    // 确保Protocol部分存在
+    if (!config.Protocol) {
+      config.Protocol = {};
+    }
+    
+    // 更新协议版本
+    config.Protocol.version = version;
+    
+    // 保存配置文件
+    fs.writeFileSync(configPath, TOML.stringify(config));
+    
+    res.json({
+      success: true,
+      message: `协议版本已更新为 ${version}`,
+      data: { version }
+    });
+  } catch (error) {
+    console.error('更新协议版本失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '更新协议版本失败',
+      error: error.message
+    });
+  }
+};
+
+// 获取完整配置文件内容
+exports.getRawConfig = (req, res) => {
+  try {
+    // 查找主项目根目录
+    const rootDir = path.resolve(__dirname, '../../../..');
+    const configPath = path.join(rootDir, 'main_config.toml');
+    
+    if (!fs.existsSync(configPath)) {
+      return res.status(404).json({
+        success: false,
+        message: '配置文件不存在',
+        error: `找不到文件: ${configPath}`
+      });
+    }
+    
+    // 读取TOML配置文件
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    
+    res.json({
+      success: true,
+      data: {
+        content: configContent
+      }
+    });
+  } catch (error) {
+    console.error('获取原始配置失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取原始配置失败',
+      error: error.message
+    });
+  }
+};
+
+// 保存完整配置文件内容
+exports.saveRawConfig = (req, res) => {
+  try {
+    const { content } = req.body;
+    
+    if (!content || typeof content !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: '无效的配置内容',
+        error: '配置内容必须是非空字符串'
+      });
+    }
+    
+    // 检查TOML格式是否正确
+    try {
+      TOML.parse(content);
+    } catch (parseError) {
+      return res.status(400).json({
+        success: false,
+        message: 'TOML格式错误',
+        error: parseError.message
+      });
+    }
+    
+    // 查找主项目根目录
+    const rootDir = path.resolve(__dirname, '../../../..');
+    const configPath = path.join(rootDir, 'main_config.toml');
+    
+    // 备份当前配置
+    if (fs.existsSync(configPath)) {
+      const backupPath = `${configPath}.bak`;
+      fs.copyFileSync(configPath, backupPath);
+    }
+    
+    // 保存新配置
+    fs.writeFileSync(configPath, content, 'utf-8');
+    
+    res.json({
+      success: true,
+      message: '配置文件已保存',
+      data: {}
+    });
+  } catch (error) {
+    console.error('保存配置文件失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '保存配置文件失败',
+      error: error.message
+    });
+  }
+};
+
+// 热加载插件（启用）
+exports.enablePlugin = async (req, res) => {
+  try {
+    const { pluginName } = req.params;
+    if (!pluginName) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少插件名称'
+      });
+    }
+    
+    // 获取机器人API地址（可以从环境变量或配置文件中读取）
+    const rootDir = path.resolve(__dirname, '../../../..');
+    const configPath = path.join(rootDir, 'main_config.toml');
+    
+    // 读取配置文件获取API地址（假设配置文件中有bot_api_url）
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    const config = TOML.parse(configContent);
+    
+    // 默认使用localhost:5000，如果配置文件中有设置则使用配置值
+    const botApiUrl = config.XYBot?.bot_api_url || 'http://localhost:5000';
+    
+    console.log(`向机器人发送启用插件 ${pluginName} 的请求`);
+    
+    // 发送请求到机器人API启用插件
+    const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+    const response = await fetch(`${botApiUrl}/api/plugin/enable`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        plugin_name: pluginName
+      })
+    });
+    
+    const result = await response.json();
+    
+    // 如果机器人API返回成功
+    if (result.success) {
+      // 同时更新配置文件中的禁用列表
+      let disabledPlugins = config.XYBot?.['disabled-plugins'] || [];
+      disabledPlugins = disabledPlugins.filter(p => p !== pluginName);
+      config.XYBot['disabled-plugins'] = disabledPlugins;
+      fs.writeFileSync(configPath, TOML.stringify(config));
+      
+      res.json({
+        success: true,
+        message: `插件 ${pluginName} 已成功启用`,
+        data: {
+          pluginName,
+          enabled: true
+        }
+      });
+    } else {
+      // 如果机器人API返回失败
+      res.status(400).json({
+        success: false,
+        message: result.message || `启用插件 ${pluginName} 失败`,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error(`启用插件失败:`, error);
+    res.status(500).json({
+      success: false,
+      message: '启用插件失败',
+      error: error.message
+    });
+  }
+};
+
+// 热卸载插件（禁用）
+exports.disablePlugin = async (req, res) => {
+  try {
+    const { pluginName } = req.params;
+    if (!pluginName) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少插件名称'
+      });
+    }
+    
+    // 获取机器人API地址
+    const rootDir = path.resolve(__dirname, '../../../..');
+    const configPath = path.join(rootDir, 'main_config.toml');
+    
+    // 读取配置文件获取API地址
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    const config = TOML.parse(configContent);
+    
+    // 默认使用localhost:5000
+    const botApiUrl = config.XYBot?.bot_api_url || 'http://localhost:5000';
+    
+    console.log(`向机器人发送禁用插件 ${pluginName} 的请求`);
+    
+    // 发送请求到机器人API禁用插件
+    const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+    const response = await fetch(`${botApiUrl}/api/plugin/disable`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        plugin_name: pluginName
+      })
+    });
+    
+    const result = await response.json();
+    
+    // 如果机器人API返回成功
+    if (result.success) {
+      // 同时更新配置文件中的禁用列表
+      let disabledPlugins = config.XYBot?.['disabled-plugins'] || [];
+      if (!disabledPlugins.includes(pluginName)) {
+        disabledPlugins.push(pluginName);
+      }
+      config.XYBot['disabled-plugins'] = disabledPlugins;
+      fs.writeFileSync(configPath, TOML.stringify(config));
+      
+      res.json({
+        success: true,
+        message: `插件 ${pluginName} 已成功禁用`,
+        data: {
+          pluginName,
+          enabled: false
+        }
+      });
+    } else {
+      // 如果机器人API返回失败
+      res.status(400).json({
+        success: false,
+        message: result.message || `禁用插件 ${pluginName} 失败`,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error(`禁用插件失败:`, error);
+    res.status(500).json({
+      success: false,
+      message: '禁用插件失败',
       error: error.message
     });
   }

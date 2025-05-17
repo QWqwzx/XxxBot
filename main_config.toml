@@ -1,5 +1,5 @@
 [Protocol]
-version = "Mac"
+version = "849"
 
 [Framework]
 type = "default"
@@ -40,13 +40,17 @@ disabled-plugins = [
   "FastGPT",
   "OpenAIAPI",
   "SiliconFlow",
+  "AutoSummary",
   "FileDownloader",
+  "DailyBot",
+  "BotStatus",
   "DouyinParser",
   "GifSender",
   "GetWeather",
   "GetContact",
   "FileUploadTest",
   "GroupWelcome",
+  "Leaderboard",
   "LuckyDraw",
   "News",
   "Music",
@@ -56,8 +60,7 @@ disabled-plugins = [
   "RaiseCard",
   "RedPacket",
   "VideoDemand",
-  "SignIn",
-  "Leaderboard"
+  "SignIn"
 ]
 timezone = "Asia/Shanghai"
 auto-restart = false

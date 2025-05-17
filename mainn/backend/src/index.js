@@ -5,8 +5,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // 导入路由
-const systemRoutes = require('./routes/systemRoutes');
+const systemRoutes = require('./routes/system');
 const apiRoutes = require('./routes/api'); // 导入API路由
+const pluginsRoutes = require('./routes/systemRoutes'); // 导入插件路由
 
 // CORS配置
 const corsOptions = {
@@ -31,6 +32,7 @@ app.options('*', cors(corsOptions));
 
 // API路由
 app.use('/api/system', systemRoutes);
+app.use('/api/system', pluginsRoutes); // 使用插件路由，挂载在/api/system下
 app.use('/api', apiRoutes); // 使用API路由
 
 // 错误处理中间件

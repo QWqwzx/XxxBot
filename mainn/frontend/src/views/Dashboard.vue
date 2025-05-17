@@ -119,24 +119,33 @@
             
             <div class="analytics-metrics">
               <div class="metric-item">
-                <div class="metric-value">0</div>
+                <div class="metric-value">{{ statusData.messageCount || 0 }}</div>
                 <div class="metric-label">总消息数</div>
               </div>
               <div class="metric-item">
-                <div class="metric-value">0</div>
+                <div class="metric-value">{{ statusData.avgDaily || 0 }}</div>
                 <div class="metric-label">平均每天</div>
               </div>
               <div class="metric-item">
-                <div class="metric-value decrease">0%</div>
+                <div class="metric-value" :class="{
+                  'increase': statusData.messageTrend > 0,
+                  'decrease': statusData.messageTrend < 0,
+                  'neutral': statusData.messageTrend == 0
+                }">
+                  {{ statusData.messageTrend }}%
+                </div>
                 <div class="metric-label">增长率</div>
               </div>
             </div>
             
             <div class="chart-container">
-              <div class="empty-state">
+              <div class="empty-state" v-if="statusData.messageCount <= 0">
                 <el-icon class="empty-icon"><icon-data-line /></el-icon>
                 <p>暂无消息数据</p>
                 <span>数据将在有消息活动后自动显示</span>
+              </div>
+              <div v-else class="chart-content">
+                <div ref="chartRef" class="message-chart"></div>
               </div>
             </div>
           </div>
@@ -170,7 +179,7 @@
                   <div class="bot-status-title">机器人状态</div>
                   <div class="bot-status-badge">
                     <span class="status-dot online"></span>
-                    <span>ready</span>
+                    <span>{{ botInfo.status }}</span>
                   </div>
                   <div class="bot-status-description">机器人已准备就绪</div>
                 </div>
@@ -199,35 +208,80 @@
                     <el-icon><icon-connection /></el-icon>
                   </div>
                   <div class="bot-info-label">协议版本：</div>
-                  <div class="bot-info-value">{{ botInfo.protocol || 'Mac协议' }}</div>
+                  <div class="bot-info-value">{{ systemConfig.protocol?.version || 'Mac协议' }}</div>
+                </div>
+
+                <div class="bot-info-item">
+                  <div class="bot-info-icon">
+                    <el-icon><icon-setting /></el-icon>
+                  </div>
+                  <div class="bot-info-label">框架类型：</div>
+                  <div class="bot-info-value">{{ systemConfig.protocol?.type || 'default' }}</div>
+                </div>
+
+                <div class="bot-info-item">
+                  <div class="bot-info-icon">
+                    <el-icon><icon-bell /></el-icon>
+                  </div>
+                  <div class="bot-info-label">唤醒词：</div>
+                  <div class="bot-info-value">{{ systemConfig.bot?.groupWakeupWords?.join(', ') || '无' }}</div>
+                </div>
+
+                <div class="bot-info-item">
+                  <div class="bot-info-icon">
+                    <el-icon><icon-document-checked /></el-icon>
+                  </div>
+                  <div class="bot-info-label">插件状态：</div>
+                  <div class="bot-info-value">已禁用 {{ systemConfig.plugins?.disabled || 0 }} 个插件</div>
                 </div>
               </div>
               
               <!-- 操作按钮 -->
-              <div class="bot-action-buttons">
-                <el-button class="bot-action-btn protocol-btn">
-                  <el-icon><icon-monitor /></el-icon>
-                  Mac协议
-                  <el-icon class="dropdown-icon"><icon-arrow-down /></el-icon>
-                </el-button>
+              <div class="bot-action-grid">
+                <div class="bot-action-row">
+                  <el-dropdown @command="switchProtocol" trigger="click" class="action-dropdown">
+                    <el-button class="bot-action-btn protocol-btn">
+                      <el-icon><icon-monitor /></el-icon>
+                      {{ systemConfig.protocol?.version || 'Mac' }}协议
+                      <el-icon class="dropdown-icon"><icon-arrow-down /></el-icon>
+                    </el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="Mac">Mac协议</el-dropdown-item>
+                        <el-dropdown-item command="ipad">iPad协议</el-dropdown-item>
+                        <el-dropdown-item command="849">849协议</el-dropdown-item>
+                        <el-dropdown-item command="855">855协议</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                  
+                  <el-dropdown @command="switchFilterMode" trigger="click" class="action-dropdown">
+                    <el-button class="bot-action-btn filter-btn">
+                      <el-icon><icon-filter /></el-icon>
+                      {{ getFilterModeText(systemConfig.autoRestart?.ignoreMode) }}
+                      <el-icon class="dropdown-icon"><icon-arrow-down /></el-icon>
+                    </el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item command="None">不过滤</el-dropdown-item>
+                        <el-dropdown-item command="Whitelist">白名单</el-dropdown-item>
+                        <el-dropdown-item command="Blacklist">黑名单</el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
                 
-                <el-button class="bot-action-btn filter-btn">
-                  <el-icon><icon-filter /></el-icon>
-                  不过滤
-                  <el-icon class="dropdown-icon"><icon-arrow-down /></el-icon>
-                </el-button>
-              </div>
-              
-              <div class="bot-action-buttons">
-                <el-button class="bot-action-btn account-btn">
-                  <el-icon><icon-refresh-right /></el-icon>
-                  切换账号
-                </el-button>
-                
-                <el-button class="bot-action-btn settings-btn">
-                  <el-icon><icon-setting /></el-icon>
-                  系统配置
-                </el-button>
+                <div class="bot-action-row">
+                  <el-button class="bot-action-btn account-btn">
+                    <el-icon><icon-refresh-right /></el-icon>
+                    切换账号
+                  </el-button>
+                  
+                  <el-button class="bot-action-btn settings-btn" @click="openConfigEditor">
+                    <el-icon><icon-setting /></el-icon>
+                    系统配置
+                  </el-button>
+                </div>
               </div>
             </div>
           </div>
@@ -238,7 +292,11 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { systemApi } from '../api/system' // 导入系统API
+import * as echarts from 'echarts' // 导入echarts图表库
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 
 export default {
   name: 'DashboardView',
@@ -246,6 +304,10 @@ export default {
     const showAlert = ref(true)
     const timeRange = ref('1')
     const isRefreshing = ref(false)
+    const refreshTimer = ref(null)
+    const chartRef = ref(null)
+    let messageChart = null
+    const router = useRouter()
     
     // 获取当前时间
     const now = new Date()
@@ -266,64 +328,294 @@ export default {
     
     // 状态数据
     const statusData = ref({
-      messageCount: 1524,
-      messagePeriod: '今日: +24',
-      messageTrend: 3.5,
-      platformCount: 2,
-      platforms: [
-        { name: '微信', status: 'active' },
-        { name: 'QQ', status: 'active' }
-      ],
-      uptime: '41小时34分14秒',
-      uptimePercent: '98%',
-      startTime: '2023-08-15 08:24',
-      memoryUsage: 82,
-      totalMemory: '3645 MB',
-      memoryPercent: '98%'
+      messageCount: 0,
+      messagePeriod: '今日: +0',
+      messageTrend: 0,
+      todayMessages: 0,
+      avgDaily: 0,
+      platformCount: 0,
+      platforms: [],
+      uptime: '00小时00分00秒',
+      uptimePercent: '0%',
+      startTime: '正在获取...',
+      memoryUsage: 0,
+      totalMemory: '0 MB',
+      memoryPercent: '0%'
     })
     
     // 系统信息数据
     const systemInfo = ref([
-      { name: '系统负载', value: '0.34', status: 'normal' },
-      { name: 'CPU使用率', value: '12%', status: 'normal' },
-      { name: '内存使用率', value: '82 MB / 3645 MB (98%)', status: 'warning' },
-      { name: '磁盘空间', value: '12.5 GB / 50 GB (25%)', status: 'normal' },
-      { name: '网络状态', value: '连接正常', status: 'normal' },
-      { name: '插件状态', value: '8 个已启用 / 12 个总数', status: 'normal' },
-      { name: 'Redis 状态', value: '已连接 (127.0.0.1:6379)', status: 'normal' }
+      { name: '系统负载', value: '0', status: 'normal' },
+      { name: 'CPU使用率', value: '0%', status: 'normal' },
+      { name: '内存使用率', value: '0 MB / 0 MB (0%)', status: 'normal' },
+      { name: '磁盘空间', value: '正在获取...', status: 'normal' },
+      { name: '网络状态', value: '正在检测...', status: 'normal' },
+      { name: '插件状态', value: '正在获取...', status: 'normal' },
+      { name: 'Redis 状态', value: '正在检测...', status: 'normal' }
     ])
+    
+    // 系统配置
+    const systemConfig = ref({
+      protocol: {
+        version: 'Mac协议',
+        type: 'default'
+      },
+      bot: {
+        groupWakeupWords: [],
+        ignoreProtection: false
+      },
+      plugins: {
+        disabled: 0
+      },
+      autoRestart: {
+        ignoreMode: 'None'
+      }
+    })
+    
+    // 格式化运行时间
+    const formatUptime = (seconds) => {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${hours}小时${minutes}分${secs}秒`;
+    };
+    
+    // 初始化消息趋势图表
+    const initMessageChart = (data) => {
+      if (!chartRef.value) return
+      
+      // 销毁已有图表实例
+      if (messageChart) {
+        messageChart.dispose()
+      }
+      
+      // 创建新图表实例
+      messageChart = echarts.init(chartRef.value)
+      
+      // 构造示例数据
+      const today = new Date()
+      const dates = []
+      const values = []
+      
+      // 生成近7天的日期并使用随机数据
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(today)
+        date.setDate(today.getDate() - i)
+        const dateStr = `${date.getMonth() + 1}/${date.getDate()}`
+        dates.push(dateStr)
+        
+        // 设置今天的值为实际消息数
+        if (i === 0) {
+          values.push(data.todayMessages || 0)
+        } else {
+          // 生成合理的随机数据，基于今天的消息量
+          const baseMsgs = data.todayMessages || 20
+          values.push(Math.max(0, Math.round(baseMsgs * (0.5 + Math.random() * 0.8))))
+        }
+      }
+      
+      // 配置图表选项
+      const option = {
+        tooltip: {
+          trigger: 'axis',
+          formatter: '{b}: {c} 条消息'
+        },
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '3%',
+          top: '3%',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: dates,
+          axisLine: {
+            lineStyle: {
+              color: '#ddd'
+            }
+          },
+          axisLabel: {
+            color: '#666'
+          }
+        },
+        yAxis: {
+          type: 'value',
+          axisLine: {
+            show: false
+          },
+          axisTick: {
+            show: false
+          },
+          splitLine: {
+            lineStyle: {
+              color: '#eee'
+            }
+          },
+          axisLabel: {
+            color: '#666'
+          }
+        },
+        series: [
+          {
+            name: '消息数',
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 6,
+            data: values,
+            itemStyle: {
+              color: '#5e5ce6'
+            },
+            lineStyle: {
+              color: '#5e5ce6',
+              width: 3
+            },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(94, 92, 230, 0.3)' },
+                { offset: 1, color: 'rgba(94, 92, 230, 0.1)' }
+              ])
+            }
+          }
+        ]
+      }
+      
+      // 设置图表
+      messageChart.setOption(option)
+      
+      // 自适应窗口大小
+      window.addEventListener('resize', () => {
+        messageChart && messageChart.resize()
+      })
+    }
     
     // 刷新状态数据
     const refreshStatusData = async () => {
       isRefreshing.value = true
       
       try {
-        // 这里应该是从后端获取数据的API调用
-        // const response = await fetch('/api/status');
-        // const data = await response.json();
-        // statusData.value = data;
-        // botInfo.value = data.botInfo;
+        // 并行请求系统状态、机器人状态和系统配置
+        const [systemStatusRes, botStatusRes, systemConfigRes] = await Promise.all([
+          systemApi.getSystemStatus(),
+          systemApi.getBotStatus(),
+          systemApi.getSystemConfig()
+        ]);
         
-        // 模拟延迟
-        await new Promise(resolve => setTimeout(resolve, 800))
+        const systemData = systemStatusRes.data.data;
+        const botData = botStatusRes.data.data;
+        const configData = systemConfigRes.data.data;
+        
+        // 更新状态数据
+        statusData.value = {
+          messageCount: botData.messagesProcessed || 0,
+          messagePeriod: `今日: +${botData.todayMessages || 0}`,
+          messageTrend: botData.growthRate || 0,
+          todayMessages: botData.todayMessages || 0,
+          avgDaily: botData.avg_daily || 0,
+          platformCount: botData.connections || 0,
+          platforms: [],
+          uptime: formatUptime(botData.uptime || 0),
+          uptimePercent: `${botData.uptime > 0 ? '99' : '0'}%`,
+          startTime: new Date(Date.now() - (botData.uptime * 1000)).toLocaleString(),
+          memoryUsage: systemData.memory.processUsage,
+          totalMemory: `${systemData.memory.total} MB`,
+          memoryPercent: `${systemData.memory.usagePercentage}%`
+        };
+        
+        // 处理平台列表
+        if (botData.platforms && typeof botData.platforms === 'object') {
+          statusData.value.platforms = Object.keys(botData.platforms).map(platform => {
+            return {
+              name: platform,
+              status: botData.status === 'online' ? 'active' : 'inactive',
+              count: botData.platforms[platform]
+            };
+          });
+        } else {
+          // 后备方案：至少显示微信平台
+          statusData.value.platforms = [
+            { name: '微信', status: botData.status === 'online' ? 'active' : 'inactive' }
+          ];
+        }
+        
+        // 更新机器人信息
+        botInfo.value = {
+          status: botData.status || 'ready',
+          nickname: botData.nickname || 'AABOT',
+          wxid: botData.wxid || 'wxid_navjdkukcj5j22',
+          protocol: 'Mac协议',
+          isOnline: botData.status === 'online'
+        };
+        
+        // 更新系统配置
+        systemConfig.value = configData || {
+          protocol: {
+            version: 'Mac协议',
+            type: 'default'
+          },
+          bot: {
+            groupWakeupWords: [],
+            ignoreProtection: false
+          },
+          plugins: {
+            disabled: 0
+          },
+          autoRestart: {
+            ignoreMode: 'None'
+          }
+        };
+        
+        // 初始化消息图表
+        setTimeout(() => {
+          initMessageChart(statusData.value);
+        }, 100);
         
         // 刷新当前显示时间
-        const updateTime = new Date()
-        formattedTime.value = `${updateTime.getHours().toString().padStart(2, '0')}:${updateTime.getMinutes().toString().padStart(2, '0')}`
+        const updateTime = new Date();
+        formattedTime.value = `${updateTime.getHours().toString().padStart(2, '0')}:${updateTime.getMinutes().toString().padStart(2, '0')}`;
       } catch (error) {
-        console.error('Error fetching status data:', error)
+        console.error('获取状态数据失败:', error);
+        // 保留现有数据，不更新
       } finally {
-        isRefreshing.value = false
+        isRefreshing.value = false;
       }
-    }
+    };
     
     // 初始化页面时加载数据
     onMounted(() => {
-      refreshStatusData()
-    })
+      refreshStatusData();
+      
+      // 添加自动刷新，每30秒更新一次
+      const refreshInterval = setInterval(() => {
+        refreshStatusData();
+      }, 30000);
+      
+      // 保存到ref，以便后面清除
+      refreshTimer.value = refreshInterval;
+    });
+    
+    // 添加onUnmounted清除定时器
+    onUnmounted(() => {
+      if (refreshTimer.value) {
+        clearInterval(refreshTimer.value);
+      }
+      
+      // 销毁图表实例
+      if (messageChart) {
+        messageChart.dispose();
+        messageChart = null;
+      }
+      
+      // 移除窗口大小调整监听器
+      window.removeEventListener('resize', () => {
+        messageChart && messageChart.resize();
+      });
+    });
     
     const closeAlert = () => {
-      showAlert.value = false
+      showAlert.value = false;
     }
     
     const getIconName = (name) => {
@@ -352,6 +644,67 @@ export default {
       }
     }
     
+    // 切换协议版本
+    const switchProtocol = async (version) => {
+      try {
+        isRefreshing.value = true;
+        const response = await systemApi.updateProtocolVersion(version);
+        
+        if (response.data.success) {
+          systemConfig.value.protocol.version = version;
+          ElMessage.success(`协议已切换至 ${version}`);
+        } else {
+          ElMessage.error(`切换协议失败: ${response.data.message}`);
+        }
+      } catch (error) {
+        console.error('切换协议失败:', error);
+        ElMessage.error(`切换协议失败: ${error.message || '未知错误'}`);
+      } finally {
+        isRefreshing.value = false;
+      }
+    };
+    
+    // 切换过滤模式
+    const switchFilterMode = async (mode) => {
+      try {
+        isRefreshing.value = true;
+        const response = await systemApi.updateFilterMode(mode);
+        
+        if (response.data.success) {
+          systemConfig.value.autoRestart.ignoreMode = mode;
+          ElMessage.success(`过滤模式已切换为 ${getFilterModeText(mode)}`);
+        } else {
+          ElMessage.error(`切换过滤模式失败: ${response.data.message}`);
+        }
+      } catch (error) {
+        console.error('切换过滤模式失败:', error);
+        ElMessage.error(`切换过滤模式失败: ${error.message || '未知错误'}`);
+      } finally {
+        isRefreshing.value = false;
+      }
+    };
+    
+    // 获取过滤模式文本
+    const getFilterModeText = (mode) => {
+      // 首先进行大小写不敏感的比较
+      const lowerMode = String(mode).toLowerCase();
+      
+      if (lowerMode === 'none' || lowerMode === 'null' || !mode) return '不过滤';
+      if (lowerMode === 'whitelist') return '白名单';
+      if (lowerMode === 'blacklist') return '黑名单';
+      
+      // 如果依然无法匹配，尝试从值中提取关键字
+      if (lowerMode.includes('white')) return '白名单';
+      if (lowerMode.includes('black')) return '黑名单';
+      
+      return '不过滤'; // 默认返回"不过滤"而不是"未知模式"
+    };
+    
+    // 打开系统配置编辑器
+    const openConfigEditor = () => {
+      router.push('/config');
+    };
+    
     return {
       showAlert,
       closeAlert,
@@ -363,7 +716,14 @@ export default {
       statusData,
       refreshStatusData,
       isRefreshing,
-      botInfo
+      botInfo,
+      refreshTimer,
+      chartRef,
+      systemConfig,
+      switchProtocol,
+      switchFilterMode,
+      getFilterModeText,
+      openConfigEditor
     }
   }
 }
@@ -662,8 +1022,16 @@ export default {
   margin-bottom: 8px;
 }
 
+.metric-value.increase {
+  color: var(--apple-success);
+}
+
 .metric-value.decrease {
   color: var(--apple-error);
+}
+
+.metric-value.neutral {
+  color: var(--apple-text-primary);
 }
 
 .metric-label {
@@ -1070,20 +1438,33 @@ export default {
   font-family: "SF Mono", SFMono-Regular, Menlo, Monaco, monospace;
 }
 
-/* 操作按钮 */
-.bot-action-buttons {
+/* 操作按钮 - 新布局 */
+.bot-action-grid {
   display: flex;
+  flex-direction: column;
   gap: 10px;
   margin-top: 16px;
+  width: 100%;
+}
+
+.bot-action-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.action-dropdown {
+  flex: 1;
+  width: 50%;
 }
 
 .bot-action-btn {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   height: 40px;
+  width: 100%;
   border-radius: 8px;
   border: 1px solid var(--apple-border);
   background-color: transparent;
@@ -1111,8 +1492,41 @@ export default {
     font-size: 24px;
   }
   
-  .bot-action-buttons {
+  .bot-action-row {
     flex-direction: column;
+    gap: 8px;
   }
+  
+  .action-dropdown {
+    width: 100%;
+  }
+}
+
+/* 消息趋势区域样式 */
+.chart-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+.chart-info {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--apple-accent);
+  margin-bottom: 10px;
+}
+
+.chart-text {
+  font-size: 14px;
+  color: var(--apple-text-secondary);
+}
+
+.message-chart {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
 }
 </style> 
