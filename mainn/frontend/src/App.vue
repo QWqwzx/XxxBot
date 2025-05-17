@@ -83,12 +83,6 @@
                 </template>
               </el-menu-item>
               
-              <el-menu-item index="/reminders">
-                <el-icon><icon-alarm-clock /></el-icon>
-                <template #title>
-                  <span class="menu-item-text">提醒管理</span>
-                </template>
-              </el-menu-item>
             </div>
             
             <div class="menu-section">
@@ -96,21 +90,7 @@
               <el-menu-item index="/terminal">
                 <el-icon><icon-terminal /></el-icon>
                 <template #title>
-                  <span class="menu-item-text">终端</span>
-                </template>
-              </el-menu-item>
-              
-              <el-menu-item index="/chat">
-                <el-icon><icon-chat /></el-icon>
-                <template #title>
-                  <span class="menu-item-text">聊天</span>
-                </template>
-              </el-menu-item>
-              
-              <el-menu-item index="/database">
-                <el-icon><icon-data-analysis /></el-icon>
-                <template #title>
-                  <span class="menu-item-text">数据库</span>
+                  <span class="menu-item-text">终端/日志查看器</span>
                 </template>
               </el-menu-item>
             </div>
@@ -166,7 +146,6 @@
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item>个人设置</el-dropdown-item>
                   <el-dropdown-item divided>退出登录</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -224,27 +203,106 @@ export default {
 </script>
 
 <style>
+/* 主题变量 - 浅色主题（默认） */
 :root {
-  --apple-background: #ffffff;
-  --apple-bg-secondary: #f5f5f7;
-  --apple-text-primary: #1d1d1f;
-  --apple-text-secondary: #86868b;
-  --apple-accent: #0066cc;
-  --apple-success: #34c759;
-  --apple-warning: #ff9500;
-  --apple-error: #ff3b30;
-  --apple-info: #007aff;
-  --apple-border: #d2d2d7;
-  --apple-border-light: rgba(0, 0, 0, 0.05);
-  --apple-hover: #f5f5f7;
-  --apple-shadow: rgba(0, 0, 0, 0.05);
-  --apple-shadow-deeper: rgba(0, 0, 0, 0.1);
+  /* 背景颜色 */
+  --background-color: #f5f5f7;
+  --card-background: #ffffff;
+  --sidebar-background: rgba(255, 255, 255, 0.7);
+  --header-background: rgba(255, 255, 255, 0.8);
+  
+  /* 文本颜色 */
+  --text-color: #1d1d1f;
+  --text-secondary: #86868b;
+  
+  /* 主题和状态颜色 */
+  --accent-color: #0066cc;
+  --success-color: #34c759;
+  --warning-color: #ff9500;
+  --danger-color: #ff3b30;
+  --info-color: #007aff;
+  
+  /* 边框和分割线 */
+  --border-color: #d2d2d7;
+  --divider-color: rgba(0, 0, 0, 0.05);
+  
+  /* 交互状态 */
+  --hover-background: rgba(0, 0, 0, 0.03);
+  --active-background: rgba(0, 102, 204, 0.1);
+  --input-background: rgba(0, 0, 0, 0.02);
+  
+  /* 开关组件 */
+  --toggle-background: rgba(0, 0, 0, 0.1);
+  --toggle-active: #34c759;
+  
+  /* 阴影 */
+  --shadow-color: rgba(0, 0, 0, 0.05);
+  --shadow-deeper: rgba(0, 0, 0, 0.1);
+  --modal-backdrop: rgba(0, 0, 0, 0.3);
+  
+  /* 布局和尺寸 */
   --apple-sidebar-width: 220px;
   --apple-sidebar-mini-width: 64px;
   --apple-radius-sm: 6px;
   --apple-radius: 10px;
   --apple-radius-lg: 14px;
   --apple-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 深色主题 */
+.theme-dark {
+  /* 背景颜色 */
+  --background-color: #1a1a1c;
+  --card-background: #2c2c2e;
+  --sidebar-background: rgba(44, 44, 46, 0.7);
+  --header-background: rgba(28, 28, 30, 0.8);
+  
+  /* 文本颜色 */
+  --text-color: #ffffff;
+  --text-secondary: #aeaeb2;
+  
+  /* 主题和状态颜色 */
+  --accent-color: #0a84ff;
+  --success-color: #30d158;
+  --warning-color: #ff9f0a;
+  --danger-color: #ff453a;
+  --info-color: #64d2ff;
+  
+  /* 边框和分割线 */
+  --border-color: #38383a;
+  --divider-color: rgba(255, 255, 255, 0.1);
+  
+  /* 交互状态 */
+  --hover-background: rgba(255, 255, 255, 0.05);
+  --active-background: rgba(10, 132, 255, 0.2);
+  --input-background: rgba(255, 255, 255, 0.05);
+  
+  /* 开关组件 */
+  --toggle-background: rgba(255, 255, 255, 0.2);
+  --toggle-active: #30d158;
+  
+  /* 阴影 */
+  --shadow-color: rgba(0, 0, 0, 0.2);
+  --shadow-deeper: rgba(0, 0, 0, 0.3);
+  --modal-backdrop: rgba(0, 0, 0, 0.5);
+}
+
+/* 向后兼容的变量定义 */
+:root {
+  --apple-background: var(--card-background);
+  --apple-bg-secondary: var(--background-color);
+  --apple-text-primary: var(--text-color);
+  --apple-text-secondary: var(--text-secondary);
+  --apple-accent: var(--accent-color);
+  --apple-success: var(--success-color);
+  --apple-warning: var(--warning-color);
+  --apple-error: var(--danger-color);
+  --apple-info: var(--info-color);
+  --apple-border: var(--border-color);
+  --apple-border-light: var(--divider-color);
+  --apple-hover: var(--hover-background);
+  --apple-shadow: var(--shadow-color);
+  --apple-shadow-deeper: var(--shadow-deeper);
 }
 
 * {
@@ -259,9 +317,10 @@ body {
   font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: var(--apple-text-primary);
-  background-color: var(--apple-bg-secondary);
+  color: var(--text-color);
+  background-color: var(--background-color);
   overflow: hidden;
+  transition: background-color 0.3s, color 0.3s;
 }
 
 #app {
@@ -276,13 +335,15 @@ body {
 
 /* 侧边栏样式 */
 .sidebar {
-  background-color: var(--apple-background);
-  box-shadow: 1px 0 0 0 var(--apple-border-light);
+  background-color: var(--sidebar-background);
+  box-shadow: 1px 0 0 0 var(--divider-color);
   transition: width 0.3s ease;
   z-index: 1001;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .sidebar.collapsed {
@@ -294,7 +355,7 @@ body {
   padding: 0 16px;
   display: flex;
   align-items: center;
-  box-shadow: 0 1px 0 0 var(--apple-border-light);
+  box-shadow: 0 1px 0 0 var(--divider-color);
   z-index: 2;
   flex-shrink: 0;
 }
@@ -363,13 +424,13 @@ body {
 }
 
 .sidebar-menu .el-menu-item.is-active {
-  background-color: rgba(0, 102, 204, 0.1);
-  color: var(--apple-accent);
+  background-color: var(--active-background);
+  color: var(--accent-color);
   font-weight: 500;
 }
 
 .sidebar-menu .el-menu-item:hover {
-  background-color: var(--apple-hover);
+  background-color: var(--hover-background);
   transform: translateX(2px);
 }
 
@@ -390,7 +451,7 @@ body {
 
 .menu-label {
   font-size: 12px;
-  color: var(--apple-text-secondary);
+  color: var(--text-secondary);
   padding: 0 24px;
   margin: 8px 0;
   text-transform: uppercase;
@@ -406,17 +467,17 @@ body {
 .menu-footer {
   margin-top: auto;
   padding-bottom: 16px;
-  border-top: 1px solid var(--apple-border-light);
+  border-top: 1px solid var(--divider-color);
   margin-top: 24px;
   padding-top: 16px;
 }
 
 /* 头部样式 */
 .main-header {
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: var(--header-background);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 1px 0 0 var(--apple-border-light);
+  box-shadow: 0 1px 0 0 var(--divider-color);
   padding: 0 24px;
   display: flex;
   align-items: center;
@@ -431,11 +492,11 @@ body {
 .toggle-sidebar-btn {
   margin-right: 16px;
   padding: 6px;
-  color: var(--apple-text-secondary);
+  color: var(--text-secondary);
 }
 
 .toggle-sidebar-btn:hover {
-  color: var(--apple-accent);
+  color: var(--accent-color);
 }
 
 .header-right {
@@ -477,15 +538,15 @@ body {
   padding: 24px;
   overflow-y: auto;
   overflow-x: hidden;
-  background-color: var(--apple-bg-secondary);
+  background-color: var(--background-color);
 }
 
 /* 页脚样式 */
 .main-footer {
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: var(--header-background);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 -1px 0 0 var(--apple-border-light);
+  box-shadow: 0 -1px 0 0 var(--divider-color);
   padding: 0 24px;
 }
 
@@ -494,13 +555,13 @@ body {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--apple-text-secondary);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
 .divider {
   margin: 0 8px;
-  color: var(--apple-border);
+  color: var(--border-color);
 }
 
 /* 动画效果 */
@@ -518,18 +579,20 @@ body {
 .el-card {
   border-radius: var(--apple-radius);
   border: none;
-  box-shadow: 0 4px 16px var(--apple-shadow);
+  box-shadow: 0 4px 16px var(--shadow-color);
   overflow: hidden;
+  background-color: var(--card-background);
+  color: var(--text-color);
 }
 
 .el-card__header {
-  border-bottom: 1px solid var(--apple-border-light);
+  border-bottom: 1px solid var(--divider-color);
   padding: 16px 20px;
 }
 
 .el-button--primary {
-  background-color: var(--apple-accent);
-  border-color: var(--apple-accent);
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
 }
 
 .el-button--primary:hover, 
@@ -539,25 +602,27 @@ body {
 }
 
 .el-button--success {
-  background-color: var(--apple-success);
-  border-color: var(--apple-success);
+  background-color: var(--success-color);
+  border-color: var(--success-color);
 }
 
 .el-button--warning {
-  background-color: var(--apple-warning);
-  border-color: var(--apple-warning);
+  background-color: var(--warning-color);
+  border-color: var(--warning-color);
 }
 
 .el-button--danger {
-  background-color: var(--apple-error);
-  border-color: var(--apple-error);
+  background-color: var(--danger-color);
+  border-color: var(--danger-color);
 }
 
 .el-dropdown-menu {
   border-radius: var(--apple-radius-sm);
-  box-shadow: 0 6px 16px var(--apple-shadow-deeper);
+  box-shadow: 0 6px 16px var(--shadow-deeper);
   border: none;
   padding: 6px;
+  background-color: var(--card-background);
+  color: var(--text-color);
 }
 
 .el-dropdown-menu__item {
